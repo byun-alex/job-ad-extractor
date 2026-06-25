@@ -1,0 +1,105 @@
+{
+  "_comment": "Golden set: real-correct answers for the extract_job task. Each case lists only the fields with a clear ground truth; the eval scorer grades a prediction against exactly those fields. skills are scored by overlap (Jaccard), the rest by exact match.",
+  "cases": [
+    {
+      "id": "c1-atlassian-senior",
+      "job_text": "Senior Backend Engineer at Atlassian, Sydney. Full-time, $160,000-$190,000 AUD. Hybrid working. You'll work with Python, Go, PostgreSQL, AWS and Docker.",
+      "expected": {
+        "title": "Senior Backend Engineer",
+        "company": "Atlassian",
+        "location": "Sydney",
+        "employment_type": "full-time",
+        "salary_min": 160000,
+        "salary_max": 190000,
+        "salary_currency": "AUD",
+        "seniority": "senior",
+        "remote": true,
+        "skills": ["Python", "Go", "PostgreSQL", "AWS", "Docker"]
+      }
+    },
+    {
+      "id": "c2-graduate-analyst-intern",
+      "job_text": "Graduate Data Analyst (6-month internship) in Melbourne. On-site. Skills: SQL, Excel, Power BI, Python.",
+      "expected": {
+        "title": "Graduate Data Analyst",
+        "location": "Melbourne",
+        "employment_type": "internship",
+        "seniority": "intern",
+        "remote": false,
+        "skills": ["SQL", "Excel", "Power BI", "Python"]
+      }
+    },
+    {
+      "id": "c3-casual-barista",
+      "job_text": "Casual barista wanted in Brisbane. $28/hr. No experience needed, training provided.",
+      "expected": {
+        "title": "Barista",
+        "location": "Brisbane",
+        "employment_type": "casual",
+        "salary_min": 28,
+        "salary_currency": "AUD",
+        "skills": []
+      }
+    },
+    {
+      "id": "c4-aera-ai-automation",
+      "job_text": "AI Automation Specialist at AERA, Alexandria, Sydney NSW (Hybrid). Full time. Strong programming and scripting (Python, PowerShell, Bash); hands-on with AI/ML frameworks (TensorFlow, PyTorch, Scikit-learn) and automation platforms (Ansible, Terraform, Zapier, Make).",
+      "expected": {
+        "title": "AI Automation Specialist",
+        "company": "AERA",
+        "employment_type": "full-time",
+        "remote": true,
+        "skills": ["Python", "PowerShell", "Bash", "TensorFlow", "PyTorch", "Scikit-learn", "Ansible", "Terraform", "Zapier", "Make"]
+      }
+    },
+    {
+      "id": "c5-lead-ml-remote-contract",
+      "job_text": "Lead Machine Learning Engineer, fully remote. 12-month contract, $90-120/hr USD. PyTorch, TensorFlow, Kubernetes, MLflow.",
+      "expected": {
+        "title": "Lead Machine Learning Engineer",
+        "employment_type": "contract",
+        "salary_min": 90,
+        "salary_max": 120,
+        "salary_currency": "USD",
+        "seniority": "lead",
+        "remote": true,
+        "skills": ["PyTorch", "TensorFlow", "Kubernetes", "MLflow"]
+      }
+    },
+    {
+      "id": "c6-canva-junior-frontend",
+      "job_text": "Part-time Junior Frontend Developer at Canva, Sydney (hybrid). $45/hr. React, TypeScript, CSS.",
+      "expected": {
+        "title": "Junior Frontend Developer",
+        "company": "Canva",
+        "location": "Sydney",
+        "employment_type": "part-time",
+        "salary_min": 45,
+        "seniority": "junior",
+        "remote": true,
+        "skills": ["React", "TypeScript", "CSS"]
+      }
+    },
+    {
+      "id": "c7-telstra-devops",
+      "job_text": "DevOps Engineer - Telstra, Canberra. Full time. Terraform, Ansible, AWS, Jenkins, Bash.",
+      "expected": {
+        "title": "DevOps Engineer",
+        "company": "Telstra",
+        "location": "Canberra",
+        "employment_type": "full-time",
+        "skills": ["Terraform", "Ansible", "AWS", "Jenkins", "Bash"]
+      }
+    },
+    {
+      "id": "c8-account-manager-perth",
+      "job_text": "Hiring an Account Manager, full-time, Perth. Tools: Salesforce, HubSpot, Excel.",
+      "expected": {
+        "title": "Account Manager",
+        "location": "Perth",
+        "employment_type": "full-time",
+        "skills": ["Salesforce", "HubSpot", "Excel"]
+      }
+    }
+  ]
+}

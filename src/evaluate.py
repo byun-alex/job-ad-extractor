@@ -1,0 +1,176 @@
+"""Eval runner: score the extractor against the golden set, write a report,
+and flag regressions vs the previous run.
+
+Run:  python -m src.evaluate            # uses prompt v2
+      python -m src.evaluate --version v1
+
+For each case we compare the prediction to the golden answer field-by-field:
+- strings / enums : case-insensitive exact match
+- numbers         : equal
+- booleans        : equal
+- skills (a list) : Jaccard overlap >= SKILL_THRESHOLD counts as a match
+A case "passes" only if every graded field matches. The headline metric is the
+pass rate across cases, plus field-level accuracy.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+
+from .extract import extract_job
+
+ROOT = Path(__file__).resolve().parent.parent
+GOLDEN = ROOT / "data" / "golden.json"
+REPORTS = ROOT / "reports"
+REPORTS.mkdir(exist_ok=True)
+LAST_RUN = REPORTS / "last_run.json"
+REPORT_MD = REPORTS / "eval_report.md"
+
+SKILL_THRESHOLD = 0.6
+
+
+def _norm(v):
+    return v.lower().strip() if isinstance(v, str) else v
+
+
+def _jaccard(a: list[str], b: list[str]) -> float:
+    sa = {s.lower().strip() for s in a}
+    sb = {s.lower().strip() for s in b}
+    if not sa and not sb:
+        return 1.0
+    if not sa or not sb:
+        return 0.0
+    return len(sa & sb) / len(sa | sb)
+
+
+def score_case(expected: dict, predicted) -> tuple[bool, list[str]]:
+    """Return (case_passed, list_of_failed_field_descriptions)."""
+    if predicted is None:
+        return False, ["<no valid prediction>"]
+
+    pred = predicted.model_dump()
+    failures: list[str] = []
+
+    for field, exp in expected.items():
+        got = pred.get(field)
+        if field == "skills":
+            j = _jaccard(exp, got or [])
+            if j < SKILL_THRESHOLD:
+                failures.append(f"skills (overlap {j:.2f}: got {got})")
+        else:
+            # enums come back as Enum -> compare by value
+            got_val = got.value if hasattr(got, "value") else got
+            if _norm(got_val) != _norm(exp):
+                failures.append(f"{field} (want {exp!r}, got {got_val!r})")
+
+    return (len(failures) == 0), failures
+
+
+def run(version: str = "v2") -> dict:
+    data = json.loads(GOLDEN.read_text(encoding="utf-8"))
+    cases = data["cases"]
+
+    results = []
+    model_name = None
+    passed = 0
+    field_total = 0
+    field_ok = 0
+
+    for case in cases:
+        res = extract_job(case["job_text"], version=version)
+        model_name = res.model
+        ok, failures = score_case(case["expected"], res.posting)
+        passed += int(ok)
+        n_fields = len(case["expected"])
+        field_total += n_fields
+        field_ok += n_fields - len(failures)
+        results.append({"id": case["id"], "passed": ok, "failures": failures})
+
+    summary = {
+        "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "model": model_name,
+        "prompt_version": version,
+        "n_cases": len(cases),
+        "passed": passed,
+        "pass_rate": round(passed / len(cases), 3),
+        "field_accuracy": round(field_ok / field_total, 3) if field_total else 0.0,
+        "results": results,
+    }
+    return summary
+
+
+def load_previous() -> dict | None:
+    if LAST_RUN.exists():
+        return json.loads(LAST_RUN.read_text(encoding="utf-8"))
+    return None
+
+
+def find_regressions(prev: dict | None, curr: dict) -> list[str]:
+    if not prev:
+        return []
+    prev_pass = {r["id"]: r["passed"] for r in prev["results"]}
+    regressed = []
+    for r in curr["results"]:
+        if prev_pass.get(r["id"]) and not r["passed"]:
+            regressed.append(r["id"])
+    return regressed
+
+
+def write_report(curr: dict, prev: dict | None, regressions: list[str]) -> None:
+    lines = ["# Eval report — extract_job", ""]
+    lines.append(f"- **Run:** {curr['timestamp']}")
+    lines.append(f"- **Model:** `{curr['model']}`  ·  **Prompt:** `{curr['prompt_version']}`")
+    lines.append(
+        f"- **Headline:** {curr['passed']}/{curr['n_cases']} cases pass "
+        f"(**{curr['pass_rate']*100:.0f}%**), field accuracy **{curr['field_accuracy']*100:.0f}%**"
+    )
+    if prev:
+        delta = curr["pass_rate"] - prev["pass_rate"]
+        arrow = "up" if delta > 0 else ("down" if delta < 0 else "flat")
+        lines.append(
+            f"- **vs last run:** {arrow} {delta*100:+.0f} pts "
+            f"(was {prev['pass_rate']*100:.0f}% on `{prev['model']}`/`{prev['prompt_version']}`)"
+        )
+    if regressions:
+        lines.append(f"- **⚠️ REGRESSIONS:** {', '.join(regressions)} (passed before, fail now)")
+    lines += ["", "| Case | Result | Failing fields |", "|------|--------|----------------|"]
+    for r in curr["results"]:
+        mark = "✅ pass" if r["passed"] else "❌ fail"
+        fails = "; ".join(r["failures"]) if r["failures"] else "—"
+        lines.append(f"| `{r['id']}` | {mark} | {fails} |")
+    lines += [
+        "",
+        "> Generated by `python -m src.evaluate`. With the offline mock LLM the "
+        "numbers are a baseline; set `ANTHROPIC_API_KEY` for the real model's score.",
+        "",
+    ]
+    REPORT_MD.write_text("\n".join(lines), encoding="utf-8")
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--version", default="v2", help="prompt version (e.g. v1, v2)")
+    args = ap.parse_args()
+
+    prev = load_previous()
+    curr = run(args.version)
+    regressions = find_regressions(prev, curr)
+    write_report(curr, prev, regressions)
+    LAST_RUN.write_text(json.dumps(curr, indent=2), encoding="utf-8")
+
+    print(
+        f"{curr['passed']}/{curr['n_cases']} pass ({curr['pass_rate']*100:.0f}%) "
+        f"| field acc {curr['field_accuracy']*100:.0f}% "
+        f"| model {curr['model']} | prompt {curr['prompt_version']}"
+    )
+    if regressions:
+        print("REGRESSIONS:", ", ".join(regressions))
+    print(f"report -> {REPORT_MD.relative_to(ROOT)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
