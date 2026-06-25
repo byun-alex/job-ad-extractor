@@ -1,8 +1,9 @@
-# llm-eval-harness
+# job-ad-extractor
 
-A small, production-shaped harness for **structured LLM extraction** with
-**prompt versioning** and **schema validation** — the reliability layer that
-turns "an LLM call I wrote" into "an LLM call I can prove behaves."
+Turns a messy, free-text **job ad into clean structured JSON** — with
+**prompt versioning**, **structured-output validation**, and an **eval harness**:
+the reliability layer that turns "an LLM call I wrote" into "an LLM call I can
+prove behaves."
 
 Task: messy free-text **job ad → strict JSON** (`JobPosting`).
 
